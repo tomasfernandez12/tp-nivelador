@@ -4,7 +4,6 @@ from .bet import Bet
 
 _LOTTERY_WINNER_NUMBER = 7574
 
-
 class Lottery:
     def __init__(self, storage_path) -> None:
         self.storage_path = storage_path
@@ -40,3 +39,10 @@ class Lottery:
                     birthdate,
                     int(number),
                 )
+
+    def get_winners_for_agency(self, bets, agency_id: int):
+        return [
+            bet
+            for bet in bets
+            if bet.agency_id == agency_id and self.has_won(bet)
+        ]

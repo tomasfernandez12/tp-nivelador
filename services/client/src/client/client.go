@@ -2,19 +2,24 @@ package client
 
 import (
 	"bufio"
-	"fmt"
 	"net"
 	"os"
 	"time"
 
 	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/logger"
-	"github.com/7574-sistemas-distribuidos/tp-nivelador/src/safe_socket"
 )
 
 const CONNECTION_ATTEMPTS_MAX = 3
 const CONNECTION_ATTEMPS_DELAY_MS = 200
 
-const CLIENT_BUFFER_SIZE = 512
+type Bet struct {
+	AgencyId  int
+	FirstName string
+	LastName  string
+	Document  int
+	Birthdate string
+	Number    int
+}
 
 type ClientConfig struct {
 	ServerHost string
@@ -82,25 +87,45 @@ func (client *Client) Run() error {
 		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", messageId}
 		logger.Info(mainAction, logger.InProgress, messageArgs...)
 
-		clientMessage := scanner.Text()
-		if err := safe_socket.SendAll(client.conn, []byte(clientMessage)); err != nil {
-			logger.Error("send-message", logger.Fail, messageArgs...)
-			return err
-		}
-
-		responseBuffer, err := safe_socket.RecvAll(client.conn, CLIENT_BUFFER_SIZE)
+		agencyId, err := parseInteger([]byte(client.config.AgencyId))
 		if err != nil {
-			logger.Error("recv-response", logger.Fail, messageArgs...)
 			return err
 		}
-
-		if _, err := fmt.Fprintln(outputFile, string(responseBuffer)); err != nil {
-			logger.Error("write-output", logger.Fail, messageArgs...)
+		bet, err := deserializeBet(scanner.Bytes(), agencyId)
+		if err != nil {
+			return err
+		}
+		clientMessage, err := serializeBet(bet)
+		if err != nil {
+			return err
+		}
+		if err := sendMessage(client.conn, clientMessage); err != nil {
+			logger.Error("send-message", logger.Fail, messageArgs...)
 			return err
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err
+	}
+	if err := sendMessage(client.conn, nil); err != nil {
+		return err
+	}
+	for {
+		message, err := receiveMessage(client.conn)
+		if err != nil {
+			return err
+		}
+		if message.Size == 0 {
+			break
+		}
+		bet, err := deserializeSerializedBet(message.Payload)
+		if err != nil {
+			return err
+		}
+		output := serializeOutput(bet)
+		if _, err := outputFile.Write(output); err != nil {
+			return err
+		}
 	}
 	logger.Info(mainAction, logger.Success, "agency-id", client.config.AgencyId)
 
