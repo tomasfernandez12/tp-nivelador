@@ -4,6 +4,7 @@ import safe_socket
 from lottery import Lottery
 from .serialization import (
     deserialize_bet,
+    deserialize_bets,
     deserialize_message_size,
     serialize_bet,
     serialize_message_size,
@@ -39,7 +40,7 @@ class Server:
                 if not client_message:
                     break
                 message_amount += 1
-                bets.append(deserialize_bet(client_message))
+                bets.extend(deserialize_bets(client_message))
 
             self.lottery.store_bets(bets)
             agency_id = bets[0].agency_id if bets else None

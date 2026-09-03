@@ -29,6 +29,26 @@ func serializeBet(bet Bet) ([]byte, error) {
 	return payload, nil
 }
 
+func serializeBets(bets []Bet) ([]byte, error) {
+	payload := make([]byte, 0)
+	for _, bet := range bets {
+		serializedBet, err := serializeBet(bet)
+		if err != nil {
+			return nil, err
+		}
+		payload = append(payload, serializedBet...)
+	}
+	return payload, nil
+}
+
+func sendBets(socket io.Writer, bets []Bet) error {
+	payload, err := serializeBets(bets)
+	if err != nil {
+		return err
+	}
+	return sendMessage(socket, payload)
+}
+
 func parseInteger(value []byte) (int, error) {
 	if len(value) == 0 {
 		return 0, io.ErrUnexpectedEOF

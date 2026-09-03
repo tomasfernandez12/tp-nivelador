@@ -27,6 +27,7 @@ type ClientConfig struct {
 	AgencyId   string
 	InputFile  string
 	OutputFile string
+	BatchSize  int
 }
 
 type Client struct {
@@ -83,6 +84,7 @@ func (client *Client) Run() error {
 	defer outputFile.Close()
 
 	scanner := bufio.NewScanner(inputFile)
+	bets := make([]Bet, 0, client.config.BatchSize)
 	for messageId := 0; scanner.Scan(); messageId++ {
 		messageArgs := []any{"agency-id", client.config.AgencyId, "message-id", messageId}
 		logger.Info(mainAction, logger.InProgress, messageArgs...)
@@ -95,17 +97,22 @@ func (client *Client) Run() error {
 		if err != nil {
 			return err
 		}
-		clientMessage, err := serializeBet(bet)
-		if err != nil {
-			return err
-		}
-		if err := sendMessage(client.conn, clientMessage); err != nil {
-			logger.Error("send-message", logger.Fail, messageArgs...)
-			return err
+		bets = append(bets, bet)
+		if len(bets) == client.config.BatchSize {
+			if err := sendBets(client.conn, bets); err != nil {
+				logger.Error("send-message", logger.Fail, messageArgs...)
+				return err
+			}
+			bets = bets[:0]
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err
+	}
+	if len(bets) > 0 {
+		if err := sendBets(client.conn, bets); err != nil {
+			return err
+		}
 	}
 	if err := sendMessage(client.conn, nil); err != nil {
 		return err

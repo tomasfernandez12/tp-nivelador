@@ -1,9 +1,7 @@
 from lottery import Bet
 
 
-def deserialize_bet(payload: bytes) -> Bet:
-    position = 0
-
+def _deserialize_bet(payload: bytes, position: int) -> tuple[Bet, int]:
     def read_integer():
         nonlocal position
         if len(payload) - position < 4:
@@ -34,7 +32,23 @@ def deserialize_bet(payload: bytes) -> Bet:
         int(document),
         birthdate,
         int(number),
-    )
+    ), position
+
+
+def deserialize_bet(payload: bytes) -> Bet:
+    bet, position = _deserialize_bet(payload, 0)
+    if position != len(payload):
+        raise ValueError("invalid bet")
+    return bet
+
+
+def deserialize_bets(payload: bytes) -> list[Bet]:
+    bets = []
+    position = 0
+    while position < len(payload):
+        bet, position = _deserialize_bet(payload, position)
+        bets.append(bet)
+    return bets
 
 
 def serialize_bet(bet: Bet) -> bytes:
